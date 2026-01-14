@@ -1,0 +1,90 @@
+### Terminbuchung API Tests
+### Lokale Entwicklungsumgebung
+
+@baseUrl = http://localhost/api
+
+### 1. Liste aller Consultants abrufen
+GET {{baseUrl}}/consultants
+Accept: application/json
+
+### 2. Termin buchen - Erfolgreicher Fall
+POST {{baseUrl}}/bookings
+Content-Type: application/json
+
+{
+  "consultant_id": "9d4e8c2a-1b3d-4f5e-9a8c-7b6e5d4c3a2b",
+  "customer_name": "Max Mustermann",
+  "customer_email": "max.mustermann@example.com",
+  "starts_at": "2026-01-20T10:00:00Z",
+  "ends_at": "2026-01-20T11:00:00Z"
+}
+
+### 3. Termin buchen - Weitere Buchung
+POST {{baseUrl}}/bookings
+Content-Type: application/json
+
+{
+  "consultant_id": "9d4e8c2a-1b3d-4f5e-9a8c-7b6e5d4c3a2b",
+  "customer_name": "Lisa Schmidt",
+  "customer_email": "lisa.schmidt@example.com",
+  "starts_at": "2026-01-20T14:00:00Z",
+  "ends_at": "2026-01-20T15:30:00Z"
+}
+
+### 4. Termin buchen - Ungültige Email (Validierungsfehler)
+POST {{baseUrl}}/bookings
+Content-Type: application/json
+
+{
+  "consultant_id": "9d4e8c2a-1b3d-4f5e-9a8c-7b6e5d4c3a2b",
+  "customer_name": "Test User",
+  "customer_email": "invalid-email",
+  "starts_at": "2026-01-21T10:00:00Z",
+  "ends_at": "2026-01-21T11:00:00Z"
+}
+
+### 5. Termin buchen - Nicht existierender Consultant (409 Conflict)
+POST {{baseUrl}}/bookings
+Content-Type: application/json
+
+{
+  "consultant_id": "00000000-0000-0000-0000-000000000000",
+  "customer_name": "Test User",
+  "customer_email": "test@example.com",
+  "starts_at": "2026-01-21T10:00:00Z",
+  "ends_at": "2026-01-21T11:00:00Z"
+}
+
+### 6. Termin buchen - Start nach End (Validierungsfehler in TimeSlot)
+POST {{baseUrl}}/bookings
+Content-Type: application/json
+
+{
+  "consultant_id": "9d4e8c2a-1b3d-4f5e-9a8c-7b6e5d4c3a2b",
+  "customer_name": "Test User",
+  "customer_email": "test@example.com",
+  "starts_at": "2026-01-21T11:00:00Z",
+  "ends_at": "2026-01-21T10:00:00Z"
+}
+
+### 7. Termin buchen - Fehlende Pflichtfelder
+POST {{baseUrl}}/bookings
+Content-Type: application/json
+
+{
+  "consultant_id": "9d4e8c2a-1b3d-4f5e-9a8c-7b6e5d4c3a2b",
+  "customer_name": "Test User"
+}
+
+### 8. Termin buchen - Langer Name
+POST {{baseUrl}}/bookings
+Content-Type: application/json
+
+{
+  "consultant_id": "9d4e8c2a-1b3d-4f5e-9a8c-7b6e5d4c3a2b",
+  "customer_name": "Dr. Maximilian Alexander Ferdinand von Mustermann-Schmidt",
+  "customer_email": "dr.mustermann@example.com",
+  "starts_at": "2026-01-22T09:00:00Z",
+  "ends_at": "2026-01-22T10:00:00Z"
+}
+
