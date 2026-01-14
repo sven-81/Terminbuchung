@@ -1,0 +1,248 @@
+openapi: 3.0.3
+info:
+  title: Terminbuchung API (MVP)
+  description: |
+    **MVP-Scope:** Minimales Backend-Inkrement für Terminvergabe.
+
+    **Kernfunktion:**
+    - Termin bei Consultant buchen (POST /bookings)
+
+    **Fachliche Regeln:**
+    - Ein Consultant hat pro Tag eine begrenzte Kapazität
+    - Termine dürfen sich nicht überschneiden
+    - Fachlich saubere Ablehnung bei Konflikten (HTTP 409)
+
+    **Annahmen:**
+    - Consultants existieren bereits (via Seeder/Migration)
+    - Kunde identifiziert sich über Name + E-Mail
+    - Zeitzone: UTC
+    - Stornierung: Out-of-scope für MVP
+
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost/api
+    description: Local development
+
+tags:
+  - name: Bookings
+    description: Terminbuchungen (MVP-Kern)
+  - name: Consultants
+    description: Consultant-Info (Read-Only, für Tests)
+
+paths:
+  /consultants:
+    get:
+      tags:
+        - Consultants
+      summary: Liste verfügbarer Consultants
+      operationId: listConsultants
+      description: |
+        **Hilfsfunktion** für Tests und Frontend-Integration.
+        Consultants werden via Seeder angelegt, nicht via API.
+      responses:
+        '200':
+          description: Erfolgreiche Abfrage
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Consultant'
+              example:
+                data:
+                  - id: "9d4e8c2a-1b3d-4f5e-9a8c-7b6e5d4c3a2b"
+                    name: "Dr. Anna Müller"
+                    email: "anna.mueller@example.com"
+                    daily_capacity_minutes: 480
+
+  /bookings:
+    post:
+      tags:
+        - Bookings
+      summary: Termin buchen (MVP-Kernfunktion)
+      operationId: createBooking
+      description: |
+        **Kernfunktion des MVP:** Erstellt eine neue Buchung.
+
+        **Fachliche Validierungen:**
+        1. Consultant muss existieren
+        2. Start-Zeit muss vor End-Zeit liegen
+        3. Keine Überschneidung mit bestehenden Terminen
+        4. Tageskapazität des Consultants darf nicht überschritten werden
+
+        **Bei Konflikten:** HTTP 409 mit detaillierten Fehlermeldungen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - consultant_id
+                - customer_name
+                - customer_email
+                - starts_at
+                - ends_at
+              properties:
+                consultant_id:
+                  type: string
+                  format: uuid
+                  example: "9d4e8c2a-1b3d-4f5e-9a8c-7b6e5d4c3a2b"
+                  description: "UUID des Consultants"
+                customer_name:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                  example: "Max Mustermann"
+                customer_email:
+                  type: string
+                  format: email
+                  example: "max.mustermann@example.com"
+                starts_at:
+                  type: string
+                  format: date-time
+                  example: "2026-01-20T10:00:00Z"
+                  description: "Startzeit (ISO 8601, UTC)"
+                ends_at:
+                  type: string
+                  format: date-time
+                  example: "2026-01-20T11:00:00Z"
+                  description: "Endzeit (ISO 8601, UTC)"
+      responses:
+        '201':
+          description: Buchung erfolgreich erstellt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Booking'
+              example:
+                data:
+                  id: "8c7d6e5f-4a3b-2c1d-0e9f-8a7b6c5d4e3f"
+                  consultant_id: "9d4e8c2a-1b3d-4f5e-9a8c-7b6e5d4c3a2b"
+                  customer_name: "Max Mustermann"
+                  customer_email: "max.mustermann@example.com"
+                  starts_at: "2026-01-20T10:00:00Z"
+                  ends_at: "2026-01-20T11:00:00Z"
+                  duration_minutes: 60
+                  created_at: "2026-01-14T14:30:00Z"
+        '422':
+          description: Validierungsfehler (Format, Pflichtfelder)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              example:
+                message: "The given data was invalid."
+                errors:
+                  customer_email:
+                    - "The customer email must be a valid email address."
+                  starts_at:
+                    - "The starts at field must be a valid date."
+        '409':
+          description: Fachlicher Konflikt - Termin kann nicht gebucht werden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    properties:
+                      booking:
+                        type: array
+                        items:
+                          type: string
+              example:
+                message: "Booking cannot be created due to business rule violations"
+                errors:
+                  booking:
+                    - "Time slot overlaps with existing booking from 10:00 to 11:30"
+                    - "Daily capacity exceeded: 420 minutes used, 480 minutes total"
+
+components:
+  schemas:
+    Consultant:
+      type: object
+      description: Read-Only Consultant-Info (via Seeder angelegt)
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "9d4e8c2a-1b3d-4f5e-9a8c-7b6e5d4c3a2b"
+        name:
+          type: string
+          example: "Dr. Anna Müller"
+        email:
+          type: string
+          format: email
+          example: "anna.mueller@example.com"
+        daily_capacity_minutes:
+          type: integer
+          example: 480
+          description: "Tägliche Kapazität in Minuten (8h = 480min)"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-01-14T10:00:00Z"
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "8c7d6e5f-4a3b-2c1d-0e9f-8a7b6c5d4e3f"
+        consultant_id:
+          type: string
+          format: uuid
+          example: "9d4e8c2a-1b3d-4f5e-9a8c-7b6e5d4c3a2b"
+        customer_name:
+          type: string
+          example: "Max Mustermann"
+        customer_email:
+          type: string
+          format: email
+          example: "max.mustermann@example.com"
+        starts_at:
+          type: string
+          format: date-time
+          example: "2026-01-20T10:00:00Z"
+          description: "Startzeit (ISO 8601, UTC)"
+        ends_at:
+          type: string
+          format: date-time
+          example: "2026-01-20T11:00:00Z"
+          description: "Endzeit (ISO 8601, UTC)"
+        duration_minutes:
+          type: integer
+          example: 60
+          description: "Dauer in Minuten (berechnet)"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-01-14T14:30:00Z"
+
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "The given data was invalid."
+        errors:
+          type: object
+          description: "Feldname -> Liste von Fehlermeldungen"
+          additionalProperties:
+            type: array
+            items:
+              type: string
