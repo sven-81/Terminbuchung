@@ -14,22 +14,36 @@ final readonly class CustomerName
         $this->validate();
     }
 
+
     public static function fromString(string $name): self
     {
         return new self(trim($name));
     }
+
 
     public function toString(): string
     {
         return $this->value;
     }
 
+
     private function validate(): void
+    {
+        $this->ensureNameIsNotEmpty();
+        $this->ensureNameIsNotTooLong();
+    }
+
+
+    public function ensureNameIsNotEmpty(): void
     {
         if (empty($this->value)) {
             throw new InvalidArgumentException('Customer name cannot be empty');
         }
+    }
 
+
+    public function ensureNameIsNotTooLong(): void
+    {
         if (mb_strlen($this->value) > 255) {
             throw new InvalidArgumentException('Customer name cannot exceed 255 characters');
         }

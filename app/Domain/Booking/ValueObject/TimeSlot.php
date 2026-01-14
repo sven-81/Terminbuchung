@@ -16,6 +16,7 @@ final readonly class TimeSlot
         $this->validate();
     }
 
+
     public static function fromDateTimes(
         DateTimeImmutable $startsAt,
         DateTimeImmutable $endsAt
@@ -23,36 +24,44 @@ final readonly class TimeSlot
         return new self($startsAt, $endsAt);
     }
 
+
     public function startsAt(): DateTimeImmutable
     {
         return $this->startsAt;
     }
+
 
     public function endsAt(): DateTimeImmutable
     {
         return $this->endsAt;
     }
 
+
     public function durationInMinutes(): int
     {
         $diff = $this->endsAt->getTimestamp() - $this->startsAt->getTimestamp();
+
         return (int) ($diff / 60);
     }
+
 
     public function isOnDate(DateTimeImmutable $date): bool
     {
         return $this->startsAt->format('Y-m-d') === $date->format('Y-m-d');
     }
 
+
     public function overlapsWith(TimeSlot $other): bool
     {
         return $this->startsAt < $other->endsAt && $this->endsAt > $other->startsAt;
     }
 
+
     public function isInPast(): bool
     {
         return $this->startsAt < new DateTimeImmutable('now');
     }
+
 
     private function validate(): void
     {

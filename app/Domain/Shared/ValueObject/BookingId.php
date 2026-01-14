@@ -15,25 +15,30 @@ final readonly class BookingId
         $this->validate();
     }
 
+
     public static function generate(): self
     {
         return new self(Uuid::uuid4()->toString());
     }
+
 
     public static function fromString(string $id): self
     {
         return new self($id);
     }
 
+
     public function toString(): string
     {
         return $this->value;
     }
 
+
     public function equals(BookingId $other): bool
     {
         return $this->value === $other->value;
     }
+
 
     private function validate(): void
     {
