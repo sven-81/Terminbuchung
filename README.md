@@ -1,84 +1,126 @@
-# Sven Duge
+# Terminbuchung API (MVP)
 
-#todo adapt
-#### User Management-Api Example
-
-Beispiel einer RESTful API zur Verwaltung von Benutzern mit Authentifizierung und rollenbasierter Zugriffskontrolle.
-
-**Technologien:** Laravel 11, PHP 8.4, MySQL 8.0, Docker, OpenAPI 3.0, Swagger UI, Laravel Sail
-
-**OpenAPI Dokumentation:**
-http://localhost:8080/api/documentation
+Minimales Backend für digitale Terminvergabe. Laravel 12 | PHP 8.4 | SQLite | Hexagonale Architektur
 
 ---
 
-## Run App
+## Setup & Tests
 
-- Makefile im Root erstellt mit `install-vendor` Target für Docker-basierte Composer-Installation
-- Laravel-Container mit Sail hochfahren mit `make up`
-- Swagger UI aufrufen unter http://localhost:8080/api/documentation
-- Datenbank migrieren mit `make fresh`
-- Testdaten einfügen mit `make testdata`
-- Manuell testen in der IDE: mit user-management-api/tests/http/users.http
-- Unit und System Tests ausführen mit `make test`
-- PHPStan Static Analysis mit `make phpstan`
+```bash
+# Starten
+./vendor/bin/sail up -d
+./vendor/bin/sail artisan migrate:fresh --seed
 
-Oder alles in einem Schritt mit `make show`
+# Tests (120 Tests, alle grün)
+./vendor/bin/sail test
 
----
+# API-Dokumentation
+open http://localhost/api/documentation
+```
 
-## Features
+**Endpunkte:**
+- `GET /api/consultants` - Liste aller Consultants
+- `POST /api/bookings` - Termin buchen (Kernfunktion)
 
-- Benutzer-CRUD (Create, Read, Update, Deactivate)
-- Token-basierte Authentifizierung (Laravel Sanctum)
-- Rollenbasierte Zugriffskontrolle (Admin/User)
-- Soft-Delete (Deaktivierung statt Löschung)
-- OpenAPI/Swagger Dokumentation
-- Umfassende Tests (System, Unit)
-- Docker-Support mit Laravel Sail
-- PHPStan Static Analysis
+**Testdaten:** HTTP-Requests in `api-tests.http`
 
 ---
 
-## API-Endpunkte (Beispiele)
+## Architektur-Entscheidungen
 
-- `POST   /api/v1/auth/login`   – Login (Token erhalten)
-- `GET    /api/v1/users`        – Alle User (Admin only)
-- `GET    /api/v1/users/{id}`   – User abrufen
-- `POST   /api/v1/users`        – User anlegen (Admin only)
-- `PUT    /api/v1/users/{id}`   – User aktualisieren
-- `DELETE /api/v1/users/{id}`   – User deaktivieren (Admin only)
+**Hexagonale Architektur** nach Tom Hombergs gewählt, um Geschäftsregeln zentral in der Domain zu halten statt über den Code verstreut. Lose Kopplung durch Port/Adapter-Pattern ermöglicht einfaches Austauschen von Infrastruktur-Komponenten.
 
----
+```
+Domain (Kern)
+  ├── ValueObjects: Email, TimeSlot, CustomerName, DailyCapacity
+  ├── Entities: Consultant, Booking
+  └── Business Logic in Value Objects gekapselt
 
-## Standard-Benutzer
+Application (Use Cases)
+  ├── CreateBookingService
+  └── Ports: LoadConsultantPort, SaveBookingPort
 
-| Rolle | Email        | Passwort |
-|-------|--------------|----------|
-| Admin | admin@foo.de | secret   |
-| User  | user@foo.de  | secret   |
+Adapter (Infrastruktur)
+  ├── HTTP Controller
+  └── Repositories (Query Builder statt Eloquent)
+```
 
----
-
-## Architekturentscheidungen
-
-- **Sanctum statt JWT:** Einfachere Token-Verwaltung, Standard für Laravel
-- **Policy-basierte Authorization:** Saubere Trennung, automatische Prüfung
-- **RESTful API Design:** Standard-HTTP-Methoden & Statuscodes
-- **keine hexagonale Architektur:** Projekt ist zu klein, Overhead zu groß, Refactoring möglich
+**Rich Domain Model:** Alle Value Objects sind immutable (readonly), validieren sich selbst und kapseln fachliches Verhalten (z.B. `TimeSlot::overlapsWith()`).
 
 ---
 
-## Code-Qualität
+## Getroffene Annahmen
 
-- PSR-12 Coding Standard
-- SOLID Prinzipien
-- Type Hints überall
-- PHPStan Static Analysis (`make phpstan`)
+- **Consultants via Seeder**: MVP fokussiert Buchungsprozess, CRUD-Verwaltung kommt später
+- **Keine Authentifizierung und Authorisierung**: Muss vor Produktion implementiert werden (siehe Risiken)
+- **UTC-Zeitzone**: Vermeidet Komplexität bei Zeitumstellungen
+- **Kunde = Name + E-Mail**: Kein User-Management im MVP
+- **Kapazität in Minuten**: Flexibler als feste Slot-Anzahl
 
 ---
 
-## Out of Scope
+## Erwogene Alternativen
 
-- Zeitlich nicht geschafft: OpenApi-Validierung in System Tests einzubauen
-- Zeitlich nicht geschafft: Such- und Filtermöglichkeiten
+**Eloquent Models statt Domain Entities?** Verworfen, da zu starke Framework-Kopplung.
+**Validierung nur im Controller?** Verworfen, würde Geschäftsregeln verstreuen. Value Objects validieren sich selbst.
+**Event Sourcing?** Overengineering für MVP. CRUD-Persistierung reicht aktuell.
+
+---
+
+## Risiken
+
+** Kritisch (vor Produktion):**
+1. **Keine Authentifizierung, kein Rollenmanagement** - Jeder kann aktuell Bookings anlegen. Lösung: Basic Auth 
+   implementieren.
+2. **Race Conditions** - Gleichzeitige Buchungen nicht transaktional geprüft. Lösung: Pessimistic Locks.
+3. **Fehlende Overlap-/Capacity-Checks** - Nur Format validiert, keine fachlichen Konflikte. Nächster Schritt.
+
+---
+
+## Nächste Schritte für Produktion
+
+**Phase 1: Geschäftslogik vervollständigen**
+- Overlap-Detection (DB-Query über bestehende Bookings)
+- Capacity-Check (Summe Tagesminuten)
+- Systemtests schreiben
+- OpenAPI-Response-Validierung
+
+**Phase 2: Sicherheit**
+- Input Sanitization
+- Basic Authentication
+- Transaktionen mit DB-Locks
+
+**Phase 3: Deployment**
+- Environment-Config (Prod/Staging)
+- Health-Check Endpoint
+- Load-Tests
+
+---
+
+## KI-Tools Nutzung
+
+**Tools:** Claude 3.5 Sonnet (OpenAPI-Optimierung und Code-Optimierung, Testdatenerzeugung, Dataprovider), PhpStorm AI 
+(Autovervollständigung)
+
+**Vorgehen:**
+1. OpenAPI-Spec zuerst erstellt und mit Claude optimiert
+2. Domain Layer → Application Layer → Adapter Layer
+3. Tests mit Data Providern (von Claude optimiert, Zeitersparnis)
+
+**Eigene Entscheidungen:**
+- Hexagonale Architektur (nicht KI-vorgeschlagen)
+- Rich Model Pattern
+- Test-Strategie (Unit + Feature)
+- Fehlerbehandlung (422 vs. 409)
+
+**KI-generiert:** Boilerplate für Value Objects, Test Data Providers, Repository-Struktur
+
+---
+
+## Weitblick: Consultant-Verwaltung
+
+Außerhalb MVP-Scope geplant: CRUD-Endpoints für Consultants (`POST/GET/PUT/DELETE /api/consultants`). Benötigt zusätzliche Services, E-Mail-Uniqueness-Check und Admin-Autorisierung.
+
+---
+
+**Status:** MVP abgeschlossen in ~3h | 120 Tests grün
